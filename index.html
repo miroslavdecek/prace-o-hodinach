@@ -3,20 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Platformer Duel</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Platformer Duel</title>
+    <style>
+        /* --- ZDE JE CSS --- */
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center; /* Zarovnání na střed vodorovně */
+            align-items: center; /* Zarovnání na střed svisle */
+            background-color: #222;
+            font-family: 'Arial', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        .game-container {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .instructions {
+            display: flex;
+            justify-content: space-between;
+            width: 800px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        canvas {
+            background-color: #87CEEB; /* Nebeská modř */
+            border: 5px solid #fff;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            display: block;
+        }
+    </style>
 </head>
 <body>
 
     <div class="game-container">
         <h1>Platformer Duel</h1>
         <div class="instructions">
-            <p><span style="color: #ff4d4d;">Hráč 1:</span> W, A, D (Skok, Vlevo, Vpravo)</p>
-            <p><span style="color: #4d4dff;">Hráč 2:</span> Šipky (Nahoru, Vlevo, Vpravo)</p>
+            <p><span style="color: #ff4d4d;">Hráč 1:</span> W, A, D</p>
+            <p><span style="color: #4d4dff;">Hráč 2:</span> Šipky</p>
         </div>
         <canvas id="gameCanvas"></canvas>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        // --- ZDE ZAČÍNÁ JAVASCRIPT ---
+        
+        // Počkáme, až se načte celá stránka, než spustíme hru
+        window.onload = function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // Herní nastavení
+            canvas.width = 800;
+            canvas.height = 600;
+
+            const GRAVITY = 0.5;
+            const FRICTION = 0.8; 
+
+            // Ovládání
+            const keys = {
+                w: false, a: false, d: false,
+                ArrowUp: false, ArrowLeft: false, ArrowRight: false
+            };
+
+            window.addEventListener('keydown', (e) => keys[e.key] = true);
+            window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+            // --- TŘÍDY ---
+            class Player {
+                constructor(x, y, color, controls) {
+                    this.x = x;
+                    this.y = y;
+                    this.w = 30;
+                    this.h = 30;
+                    this.color = color;
+                    this.velX = 0;
+                    this.velY = 0;
+                    this.speed = 5;
+                    this.jumpStrength = 12;
+                    this.grounded = false;
+                    this.controls = controls;
+                }
+
+                update() {
+                    // Pohyb
+                    if (keys[this.controls.left]) {
+                        if (this.velX > -this.speed) this.velX--;
+                    }
+                    if (keys[this.controls.right]) {
+                        if (this.velX < this.speed) this.velX++;
+                    }
+                    if (keys[this.controls.up] && this.grounded) {
+                        this.velY = -this.jumpStrength;
+                        this.grounded = false;
+                    }
+
+                    // Fyzika
+                    this.velX *= FRICTION;
+                    this.velY += GRAVITY;
+                    this.x += this.velX;
+                    this.y += this.velY;
+                    this.grounded = false;
+
+                    // Kolize s plošinami
+                    platforms.forEach(platform => {
+                        const dir = colCheck(this, platform);
+                        if (dir === "b") { 
+                            this.grounded = true;
+                        }
+                    });
+
+                    // Hranice
+                    if (this.x < 0) this.x = 0;
+                    if (this.x + this.w > canvas.width) this.x = canvas.width - this.w;
+                    if (this.y + this.h > canvas.height) { 
+                        this.y = canvas.height - this.h;
+                        this.grounded = true;
+                        this.velY = 0;
+                    }
+                }
+
+                draw() {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
+                    ctx.strokeStyle = "black";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(this.x, this.y, this.w, this.h);
+                }
+            }
+
+            class Platform {
+                constructor(x, y, w, h) {
+                    this.x = x; this.y = y; this.w = w; this.h = h;
+                }
+                draw() {
+                    ctx.fillStyle = "#654321"; 
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
+                    ctx.fillStyle = "#32CD32"; 
+                    ctx.fillRect(this.x, this.y, this.w, 10);
+                }
+            }
+
+            class Goal {
+                constructor(x, y) {
+                    this.x = x; this.y = y; this.w = 40; this.h = 40;
+                }
+                draw() {
+                    ctx.fillStyle = "#FFD700"; 
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
+                    ctx.fillStyle = "black";
+                    ctx.font = "bold 12px Arial";
+                    ctx.fillText("GOAL", this.x + 4, this.y + 25);
+                }
+            }
+
+            // --- KOLIZE ---
+            function colCheck(shapeA, shapeB) {
+                const vX = (shapeA.x + (shapeA.w / 2)) - (shapeB.x + (shapeB.w / 2));
+                const vY = (shapeA.y + (shapeA.h / 2)) - (shapeB.y + (shapeB.h / 2));
+                const hWidths = (shapeA.w / 2) + (shapeB.w / 2);
+                const hHeights = (shapeA.h / 2) + (shapeB.h / 2);
+                let colDir = null;
+
+                if (Math.abs(vX) < hWidths && Math.abs(vY) < hHeights) {
+                    const oX = hWidths - Math.abs(vX);
+                    const oY = hHeights - Math.abs(vY);
+                    if (oX >= oY) {
+                        if (vY > 0) { colDir = "t"; shapeA.y += oY; shapeA.velY = 0; }
+                        else { colDir = "b"; shapeA.y -= oY; shapeA.velY = 0; }
+                    } else {
+                        if (vX > 0) { colDir = "l"; shapeA.x += oX; shapeA.velX = 0; }
+                        else { colDir = "r"; shapeA.x -= oX; shapeA.velX = 0; }
+                    }
+                }
+                return colDir;
+            }
+
+            // --- INICIALIZACE LEVELU ---
+            const platforms = [];
+            platforms.push(new Platform(0, 580, 800, 20)); // Země
+            platforms.push(new Platform(0, 480, 250, 20));   
+            platforms.push(new Platform(550, 480, 250, 20)); 
+            platforms.push(new Platform(300, 380, 200, 20));
+            platforms.push(new Platform(100, 280, 150, 20)); 
+            platforms.push(new Platform(550, 280, 150, 20)); 
+            platforms.push(new Platform(320, 170, 160, 20));
+            platforms.push(new Platform(370, 90, 60, 10)); 
+
+            const goal = new Goal(380, 50);
+
+            const player1 = new Player(20, 540, "#ff4d4d", {up: "w", left: "a", right: "d"});
+            const player2 = new Player(750, 540, "#4d4dff", {up: "ArrowUp", left: "ArrowLeft", right: "ArrowRight"});
+
+            function resetGame(winnerName) {
+                setTimeout(() => {
+                    alert(winnerName + " vyhrál!");
+                    player1.x = 20; player1.y = 540; player1.velX = 0; player1.velY = 0;
+                    player2.x = 750; player2.y = 540; player2.velX = 0; player2.velY = 0;
+                }, 50);
+            }
+
+            // --- HERNÍ SMYČKA ---
+            function update() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                platforms.forEach(p => p.draw());
+                goal.draw();
+                
+                if (colCheck(player1, goal)) resetGame("Hráč 1");
+                if (colCheck(player2, goal)) resetGame("Hráč 2");
+
+                player1.update();
+                player1.draw();
+                player2.update();
+                player2.draw();
+
+                requestAnimationFrame(update);
+            }
+
+            // Spuštění
+            update();
+        };
+    </script>
 </body>
 </html>
