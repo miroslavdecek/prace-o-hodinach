@@ -3,81 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Platformer Duel</title>
+    <title>Platformer Duel - Extended</title>
     <style>
-        /* --- ZDE JE CSS --- */
         body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100vh;
             display: flex;
-            justify-content: center; /* Zarovnání na střed vodorovně */
-            align-items: center; /* Zarovnání na střed svisle */
-            background-color: #222;
-            font-family: 'Arial', sans-serif;
+            justify-content: center;
+            align-items: center;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: white;
             overflow: hidden;
         }
 
-        .game-container {
+        .game-wrapper {
+            position: relative; /* Důležité pro pozicování vítězné obrazovky */
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border: 5px solid #444;
+        }
+
+        .header {
+            position: absolute;
+            top: -60px;
+            width: 100%;
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            pointer-events: none;
         }
 
-        h1 {
-            margin: 0 0 10px 0;
-            font-size: 2rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .instructions {
+        .controls-hint {
             display: flex;
             justify-content: space-between;
-            width: 800px;
-            margin-bottom: 10px;
+            width: 100%;
             font-weight: bold;
-            font-size: 1.1rem;
+            text-shadow: 2px 2px 4px #000;
         }
 
         canvas {
-            background-color: #87CEEB; /* Nebeská modř */
-            border: 5px solid #fff;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            background-color: #87CEEB;
             display: block;
+        }
+
+        /* VYLEPŠENÁ OBRAZOVKA VÍTĚZSTVÍ (Místo alertu) */
+        #winScreen {
+            display: none; /* Skryté, dokud někdo nevyhraje */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #winMessage {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: transform 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background-color: #218838;
         }
     </style>
 </head>
 <body>
 
-    <div class="game-container">
-        <h1>Platformer Duel</h1>
-        <div class="instructions">
-            <p><span style="color: #ff4d4d;">Hráč 1:</span> W, A, D</p>
-            <p><span style="color: #4d4dff;">Hráč 2:</span> Šipky</p>
+    <div class="game-wrapper">
+        <div class="header">
+            <div class="controls-hint">
+                <span style="color: #ff4d4d;">PLAYER 1: W, A, D</span>
+                <span style="color: #4d4dff;">PLAYER 2: Šipky</span>
+            </div>
         </div>
+
         <canvas id="gameCanvas"></canvas>
+
+        <div id="winScreen">
+            <div id="winMessage">Hráč 1 vyhrál!</div>
+            <button onclick="restartGame()">HRÁT ZNOVU</button>
+        </div>
     </div>
 
     <script>
-        // --- ZDE ZAČÍNÁ JAVASCRIPT ---
-        
-        // Počkáme, až se načte celá stránka, než spustíme hru
         window.onload = function() {
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
+            const winScreen = document.getElementById('winScreen');
+            const winMessage = document.getElementById('winMessage');
 
-            // Herní nastavení
-            canvas.width = 800;
-            canvas.height = 600;
+            // --- NASTAVENÍ HRY ---
+            canvas.width = 900;  // Trochu širší pro lepší manévry
+            canvas.height = 700; // Vyšší pro delší trasu
 
-            const GRAVITY = 0.5;
-            const FRICTION = 0.8; 
+            const GRAVITY = 0.6; // Trochu těžší gravitace pro preciznější skoky
+            const FRICTION = 0.85; 
+            let gameRunning = true;
 
-            // Ovládání
             const keys = {
                 w: false, a: false, d: false,
                 ArrowUp: false, ArrowLeft: false, ArrowRight: false
@@ -89,20 +129,24 @@
             // --- TŘÍDY ---
             class Player {
                 constructor(x, y, color, controls) {
+                    this.startX = x; // Uložíme startovní pozici pro reset
+                    this.startY = y;
                     this.x = x;
                     this.y = y;
-                    this.w = 30;
-                    this.h = 30;
+                    this.w = 20; // MENŠÍ HRÁČ (bylo 30) -> těžší hra
+                    this.h = 20; 
                     this.color = color;
                     this.velX = 0;
                     this.velY = 0;
-                    this.speed = 5;
-                    this.jumpStrength = 12;
+                    this.speed = 4.5; // O něco pomalejší pro kontrolu
+                    this.jumpStrength = 11.5;
                     this.grounded = false;
                     this.controls = controls;
                 }
 
                 update() {
+                    if (!gameRunning) return; // Zastaví pohyb, když někdo vyhraje
+
                     // Pohyb
                     if (keys[this.controls.left]) {
                         if (this.velX > -this.speed) this.velX--;
@@ -125,14 +169,14 @@
                     // Kolize s plošinami
                     platforms.forEach(platform => {
                         const dir = colCheck(this, platform);
-                        if (dir === "b") { 
-                            this.grounded = true;
-                        }
+                        if (dir === "b") this.grounded = true;
                     });
 
                     // Hranice
                     if (this.x < 0) this.x = 0;
                     if (this.x + this.w > canvas.width) this.x = canvas.width - this.w;
+                    
+                    // Smrt pádem (reset na dno, ale nezabije hru)
                     if (this.y + this.h > canvas.height) { 
                         this.y = canvas.height - this.h;
                         this.grounded = true;
@@ -143,9 +187,16 @@
                 draw() {
                     ctx.fillStyle = this.color;
                     ctx.fillRect(this.x, this.y, this.w, this.h);
-                    ctx.strokeStyle = "black";
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "white"; // Bílý obrys pro lepší viditelnost
+                    ctx.lineWidth = 1;
                     ctx.strokeRect(this.x, this.y, this.w, this.h);
+                }
+                
+                reset() {
+                    this.x = this.startX;
+                    this.y = this.startY;
+                    this.velX = 0;
+                    this.velY = 0;
                 }
             }
 
@@ -154,23 +205,24 @@
                     this.x = x; this.y = y; this.w = w; this.h = h;
                 }
                 draw() {
-                    ctx.fillStyle = "#654321"; 
+                    ctx.fillStyle = "#5D4037"; // Tmavší hnědá
                     ctx.fillRect(this.x, this.y, this.w, this.h);
-                    ctx.fillStyle = "#32CD32"; 
-                    ctx.fillRect(this.x, this.y, this.w, 10);
+                    ctx.fillStyle = "#76FF03"; // Neonová tráva
+                    ctx.fillRect(this.x, this.y, this.w, 4);
                 }
             }
 
             class Goal {
                 constructor(x, y) {
-                    this.x = x; this.y = y; this.w = 40; this.h = 40;
+                    this.x = x; this.y = y; this.w = 30; this.h = 30;
                 }
                 draw() {
-                    ctx.fillStyle = "#FFD700"; 
+                    // Blikající efekt
+                    ctx.fillStyle = Math.random() > 0.5 ? "#FFD700" : "#FFA500"; 
                     ctx.fillRect(this.x, this.y, this.w, this.h);
+                    ctx.font = "10px Arial";
                     ctx.fillStyle = "black";
-                    ctx.font = "bold 12px Arial";
-                    ctx.fillText("GOAL", this.x + 4, this.y + 25);
+                    ctx.fillText("CÍL", this.x + 5, this.y + 20);
                 }
             }
 
@@ -196,39 +248,78 @@
                 return colDir;
             }
 
-            // --- INICIALIZACE LEVELU ---
+            // --- MAPA (DLOUHÁ A TĚŽŠÍ) ---
             const platforms = [];
-            platforms.push(new Platform(0, 580, 800, 20)); // Země
-            platforms.push(new Platform(0, 480, 250, 20));   
-            platforms.push(new Platform(550, 480, 250, 20)); 
-            platforms.push(new Platform(300, 380, 200, 20));
-            platforms.push(new Platform(100, 280, 150, 20)); 
-            platforms.push(new Platform(550, 280, 150, 20)); 
-            platforms.push(new Platform(320, 170, 160, 20));
-            platforms.push(new Platform(370, 90, 60, 10)); 
+            
+            // 0. Země
+            platforms.push(new Platform(0, 680, 900, 20)); 
 
-            const goal = new Goal(380, 50);
+            // 1. Patro - Rozjezd (Široké po stranách)
+            platforms.push(new Platform(0, 590, 300, 15));
+            platforms.push(new Platform(600, 590, 300, 15));
 
-            const player1 = new Player(20, 540, "#ff4d4d", {up: "w", left: "a", right: "d"});
-            const player2 = new Player(750, 540, "#4d4dff", {up: "ArrowUp", left: "ArrowLeft", right: "ArrowRight"});
+            // 2. Patro - Cesta ke středu (Užší)
+            platforms.push(new Platform(350, 500, 200, 15));
 
-            function resetGame(winnerName) {
-                setTimeout(() => {
-                    alert(winnerName + " vyhrál!");
-                    player1.x = 20; player1.y = 540; player1.velX = 0; player1.velY = 0;
-                    player2.x = 750; player2.y = 540; player2.velX = 0; player2.velY = 0;
-                }, 50);
+            // 3. Patro - Rozskok do stran (Ostrůvky) - Díra uprostřed
+            platforms.push(new Platform(150, 410, 150, 15));
+            platforms.push(new Platform(600, 410, 150, 15));
+
+            // 4. Patro - Dvojitý střed
+            platforms.push(new Platform(300, 320, 100, 15));
+            platforms.push(new Platform(500, 320, 100, 15));
+
+            // 5. Patro - Těžké skoky na krajích
+            platforms.push(new Platform(50, 230, 100, 15));
+            platforms.push(new Platform(750, 230, 100, 15));
+
+            // 6. Patro - Předfinální můstek
+            platforms.push(new Platform(250, 140, 400, 15));
+
+            // 7. Patro - Věžička pro cíl
+            platforms.push(new Platform(420, 70, 60, 10));
+
+            // Cíl (Úplně nahoře)
+            const goal = new Goal(435, 30);
+
+            // Hráči
+            const player1 = new Player(50, 640, "#ff4d4d", {up: "w", left: "a", right: "d"});
+            const player2 = new Player(830, 640, "#4d4dff", {up: "ArrowUp", left: "ArrowLeft", right: "ArrowRight"});
+
+            // --- LOGIKA VÝHRY ---
+            function triggerWin(winnerName, color) {
+                if (!gameRunning) return; // Zabraní vícenásobnému spuštění
+                gameRunning = false;
+                
+                winMessage.innerText = winnerName + " VYHRÁL!";
+                winMessage.style.color = color;
+                winScreen.style.display = "flex"; // Ukáže vítěznou obrazovku
             }
+
+            // Tato funkce je volaná tlačítkem v HTML
+            window.restartGame = function() {
+                player1.reset();
+                player2.reset();
+                winScreen.style.display = "none";
+                gameRunning = true;
+                update(); // Znovu nastartuje smyčku
+            };
 
             // --- HERNÍ SMYČKA ---
             function update() {
+                if (!gameRunning) return; // Zastaví vykreslování, když je konec
+
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Vykreslení světa
                 platforms.forEach(p => p.draw());
                 goal.draw();
                 
-                if (colCheck(player1, goal)) resetGame("Hráč 1");
-                if (colCheck(player2, goal)) resetGame("Hráč 2");
+                // Kontrola výhry
+                if (colCheck(player1, goal)) triggerWin("HRÁČ 1", "#ff4d4d");
+                if (colCheck(player2, goal)) triggerWin("HRÁČ 2", "#4d4dff");
 
+                // Update hráčů
                 player1.update();
                 player1.draw();
                 player2.update();
@@ -237,7 +328,6 @@
                 requestAnimationFrame(update);
             }
 
-            // Spuštění
             update();
         };
     </script>
