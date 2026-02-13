@@ -166,53 +166,68 @@ function colCheck(shapeA, shapeB) {
 }
 
 // --- Initialization ---
+// --- Initialization ---
 
-// Create Platforms (Map Design)
+// 1. Vytvoření plošin (Symetrická Věž)
 const platforms = [];
-platforms.push(new Platform(0, 550, 800, 50)); // Ground
-platforms.push(new Platform(200, 450, 100, 20));
-platforms.push(new Platform(400, 350, 100, 20));
-platforms.push(new Platform(100, 250, 100, 20));
-platforms.push(new Platform(600, 250, 100, 20));
-platforms.push(new Platform(350, 150, 100, 20)); // High platform
 
-// Create Goal
-const goal = new Goal(380, 110);
+// --- PŘÍZEMÍ ---
+// Základní podlaha (tenčí, aby bylo více místa pro výšku)
+platforms.push(new Platform(0, 580, 800, 20)); 
 
-// Create Players
-const player1 = new Player(50, 500, "#ff4d4d", {up: "w", left: "a", right: "d"});
-const player2 = new Player(720, 500, "#4d4dff", {up: "ArrowUp", left: "ArrowLeft", right: "ArrowRight"});
+// --- 1. PATRO (Rozjezd po stranách) ---
+// Široké plošiny vlevo a vpravo, hráči na ně musí vyskočit z rohu
+platforms.push(new Platform(0, 480, 250, 20));   // Levá
+platforms.push(new Platform(550, 480, 250, 20)); // Pravá
 
+// --- 2. PATRO (Cesta do středu) ---
+// Jedna centrální plošina, kde se hráči poprvé mohou potkat/srazit
+platforms.push(new Platform(300, 380, 200, 20));
+
+// --- 3. PATRO (Rozdělení do stran) ---
+// Hráči musí z centrální plošiny skočit zpět do krajů na menší ostrůvky
+platforms.push(new Platform(100, 280, 150, 20)); // Levý ostrůvek
+platforms.push(new Platform(550, 280, 150, 20)); // Pravý ostrůvek
+
+// --- 4. PATRO (Finální výstup) ---
+// Vysoko umístěná plošina uprostřed
+platforms.push(new Platform(320, 170, 160, 20));
+
+// --- 5. PATRO (Stříška pro cíl) ---
+// Úplně nahoře, malá plošinka přímo pro vlajku
+platforms.push(new Platform(370, 90, 60, 10)); 
+
+
+// 2. Vytvoření Cíle
+// Cíl je umístěn na úplném vrcholu (5. patro)
+const goal = new Goal(380, 50);
+
+
+// 3. Vytvoření Hráčů (Startují v protilehlých rozích dole)
+// Hráč 1 (Červený) - Levý dolní roh
+const player1 = new Player(20, 540, "#ff4d4d", {up: "w", left: "a", right: "d"});
+
+// Hráč 2 (Modrý) - Pravý dolní roh
+const player2 = new Player(750, 540, "#4d4dff", {up: "ArrowUp", left: "ArrowLeft", right: "ArrowRight"});
+
+
+// Funkce pro reset hry
 function resetGame(winnerName) {
-    alert(winnerName + " vyhrál!");
-    player1.x = 50; player1.y = 500; player1.velX = 0; player1.velY = 0;
-    player2.x = 720; player2.y = 500; player2.velX = 0; player2.velY = 0;
+    // Malá pauza, aby si hráč uvědomil výhru, než se to resetuje
+    setTimeout(() => {
+        alert(winnerName + " vyhrál!");
+        
+        // Reset pozic do startovních rohů
+        player1.x = 20; 
+        player1.y = 540; 
+        player1.velX = 0; 
+        player1.velY = 0;
+        
+        player2.x = 750; 
+        player2.y = 540; 
+        player2.velX = 0; 
+        player2.velY = 0;
+    }, 100);
 }
-
-// Game Loop
-function update() {
-    // 1. Clear Screen
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 2. Draw & Update Platforms
-    platforms.forEach(p => p.draw());
-
-    // 3. Draw & Check Goal
-    goal.draw();
-    
-    // Check Goal Collision
-    if (colCheck(player1, goal)) resetGame("Hráč 1");
-    if (colCheck(player2, goal)) resetGame("Hráč 2");
-
-    // 4. Update & Draw Players
-    player1.update();
-    player1.draw();
-    
-    player2.update();
-    player2.draw();
-
-    requestAnimationFrame(update);
-}
-
 // Start the game
 update();
